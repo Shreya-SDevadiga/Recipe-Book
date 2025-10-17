@@ -2,22 +2,11 @@
 // index.php
 include 'db.php'; // include your database connection
 
-// Handle search input
-$search = "";
-if (isset($_GET['search'])) {
-    $search = $_GET['search'];
-    $sql = "SELECT recipes.*, users.name AS user_name FROM recipes 
-            JOIN users ON recipes.user_id = users.id 
-            WHERE recipes.status = 'Approved' 
-            AND (recipes.title LIKE '%$search%' OR recipes.category LIKE '%$search%')
-            ORDER BY recipes.created_at DESC";
-} else {
-    // Fetch all approved recipes
-    $sql = "SELECT recipes.*, users.name AS user_name FROM recipes 
-            JOIN users ON recipes.user_id = users.id 
-            WHERE recipes.status = 'Approved' 
-            ORDER BY recipes.created_at DESC";
-}
+// Fetch only approved recipes
+$sql = "SELECT recipes.*, users.name AS user_name FROM recipes 
+        JOIN users ON recipes.user_id = users.id 
+        WHERE recipes.status = 'Approved' 
+        ORDER BY recipes.created_at DESC";
 
 $recipes = $conn->query($sql);
 ?>
@@ -39,47 +28,6 @@ $recipes = $conn->query($sql);
             color: white;
             padding: 20px;
             text-align: center;
-        }
-        nav {
-            background: #ff5722;
-            padding: 10px;
-            text-align: center;
-        }
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin: 0 10px;
-            padding: 8px 12px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 5px;
-            transition: 0.2s;
-        }
-        nav a:hover {
-            background: rgba(255,255,255,0.4);
-        }
-        .search-bar {
-            text-align: center;
-            margin: 20px;
-        }
-        input[type="text"] {
-            padding: 10px;
-            width: 60%;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 15px;
-            background: #ff7043;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        button:hover {
-            background: #ff5722;
         }
         .container {
             width: 90%;
@@ -140,18 +88,6 @@ $recipes = $conn->query($sql);
     <p>Discover delicious recipes shared by our users!</p>
 </header>
 
-<nav>
-    <a href="login.php">Login</a>
-    <a href="register.php">Register</a>
-</nav>
-
-<div class="search-bar">
-    <form method="GET" action="">
-        <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search by recipe name or category...">
-        <button type="submit">Search</button>
-    </form>
-</div>
-
 <div class="container">
     <?php
     if ($recipes->num_rows > 0) {
@@ -169,7 +105,8 @@ $recipes = $conn->query($sql);
                     <p><strong>Category:</strong> <?php echo htmlspecialchars($row['category']); ?></p>
 
                     <?php
-                    $previewField = 'steps'; // or 'description'
+                    // Show preview of steps as description
+                    $previewField = 'steps';
                     if (!empty($row[$previewField])) {
                         $previewText = htmlspecialchars(substr($row[$previewField], 0, 150));
                         echo "<p>$previewText...</p>";

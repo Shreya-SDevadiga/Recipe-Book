@@ -2,6 +2,7 @@
 session_start();
 include 'db.php';
 
+// 🔒 Check if user is logged in and is a normal user
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'user') {
     header("Location: login.php");
     exit;
@@ -10,15 +11,26 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'user') {
 $user_id = $_SESSION['user_id'];
 $message = "";
 
-// handle recipe delete
+// 🗑 Handle recipe delete safely using prepared statement
 if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    $conn->query("DELETE FROM recipes WHERE id='$id' AND user_id='$user_id'");
-    $message = "❌ Recipe deleted successfully!";
+    $id = intval($_GET['delete']); // prevent SQL injection
+    $stmt = $conn->prepare("DELETE FROM recipes WHERE id = ? AND user_id = ?");
+    $stmt->bind_param("ii", $id, $user_id);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        $message = "❌ Recipe deleted successfully!";
+    } else {
+        $message = "⚠️ Could not delete recipe. Please try again.";
+    }
+    $stmt->close();
 }
 
-// fetch user's recipes
-$recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY id DESC");
+// 📋 Fetch user’s recipes
+$stmt = $conn->prepare("SELECT * FROM recipes WHERE user_id = ? ORDER BY id DESC");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$recipes = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -26,9 +38,21 @@ $recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY
 <head>
     <title>User Dashboard - Recipe Book</title>
     <style>
-        body {font-family: Arial; background: #f2f2f2;}
-        .container {width: 90%; margin: 30px auto; background: white; padding: 20px; border-radius: 10px;}
-        h2 {color: #333;}
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+        }
+        .container {
+            width: 90%;
+            margin: 30px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+        }
         a, button {
             background: #007bff;
             color: white;
@@ -36,12 +60,16 @@ $recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY
             border-radius: 5px;
             text-decoration: none;
             border: none;
+            cursor: pointer;
         }
         a.delete {
-            background: red;
+            background: #dc3545;
         }
         a.edit {
-            background: orange;
+            background: #ff9800;
+        }
+        a:hover {
+            opacity: 0.9;
         }
         table {
             width: 100%;
@@ -55,21 +83,35 @@ $recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY
         }
         img {
             width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 5px;
         }
         .message {
             color: green;
             font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .top-links {
+            margin-bottom: 15px;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>👋 Welcome, <?php echo $_SESSION['name']; ?></h2>
-    <p><a href="logout.php">Logout</a> | <a href="add_recipe.php">➕ Add New Recipe</a></p>
+    <h2>👋 Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h2>
 
-    <div class="message"><?php echo $message; ?></div>
+    <div class="top-links">
+        <a href="logout.php">Logout</a> |
+        <a href="add_recipe.php">➕ Add New Recipe</a>
+    </div>
+
+    <?php if (!empty($message)) { ?>
+        <div class="message"><?php echo htmlspecialchars($message); ?></div>
+    <?php } ?>
 
     <h3>📋 Your Recipes</h3>
+
     <table>
         <tr>
             <th>ID</th>
@@ -83,13 +125,15 @@ $recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY
             <?php while ($row = $recipes->fetch_assoc()) { ?>
                 <tr>
                     <td><?php echo $row['id']; ?></td>
-                    <td><?php echo $row['title']; ?></td>
-                    <td><?php echo $row['category']; ?></td>
-                    <td><?php echo $row['status']; ?></td>
+                    <td><?php echo htmlspecialchars($row['title']); ?></td>
+                    <td><?php echo htmlspecialchars($row['category']); ?></td>
+                    <td><?php echo htmlspecialchars($row['status']); ?></td>
                     <td>
-                        <?php if ($row['image']) { ?>
-                            <img src="images/<?php echo $row['image']; ?>" alt="">
-                        <?php } else { echo "No Image"; } ?>
+                        <?php if (!empty($row['image'])) { ?>
+                            <img src="images/<?php echo htmlspecialchars($row['image']); ?>" alt="Recipe image">
+                        <?php } else { ?>
+                            No Image
+                        <?php } ?>
                     </td>
                     <td>
                         <a href="edit_recipe.php?id=<?php echo $row['id']; ?>" class="edit">✏ Edit</a>
@@ -98,7 +142,7 @@ $recipes = $conn->query("SELECT * FROM recipes WHERE user_id='$user_id' ORDER BY
                 </tr>
             <?php } ?>
         <?php } else { ?>
-            <tr><td colspan="6">No recipes added yet.</td></tr>
+            <tr><td colspan="6" style="text-align:center;">No recipes added yet.</td></tr>
         <?php } ?>
     </table>
 </div>
